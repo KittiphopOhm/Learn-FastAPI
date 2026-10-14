@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block content %}
+    <h1>List of persons</h1>
+    {% for person in persons %}
+    <a href="{{ url_for("persons_page", person_id=person.id) }}""> 
+        <span>{{ loop.index }}.</span>
+        <span>{{ person.firstname }}</span>
+        <span>{{ person.lastname }}</span>
+    </a>
+        <div></div>
+    {% endfor %}
+{% endblock content %}

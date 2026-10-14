@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div>
+        <h1>In Person Detail {{ person.id }}</h1>
+        <span>Fullname:</span>
+        <span>{{ person.firstname }}</span>
+        <span>{{ person.lastname }}</span>
+
+        <div></div>
+        <a href="{{ url_for("home") }}">
+            <button>Back</button>
+        </a>
+    </div>
+{% endblock content %}
