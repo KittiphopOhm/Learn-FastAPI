@@ -1,31 +1,24 @@
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, status, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from fastapi_blog.schemas import PersonResponse, PersonCreate
+from typing import Annotated
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from .models import model
+from .database import Base, engine, get_db
+from .schemas import PersonResponse, PersonCreate, UserResponse, UserCreate
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-templates = Jinja2Templates(directory="templates")
+app.mount("media", StaticFiles(directory="media"), name="media")
 
-persons: list[dict] = [
-    {
-        "id": 1,
-        "firstname": "Kittiphop",
-        "lastname": "Siranonchai",
-        "age": 20,
-        "phone": "0483729304"
-    },
-    {
-        "id": 2,
-        "firstname": "John",
-        "lastname": "Doe",
-        "age": 27,
-        "phone": "0483729004"
-    },
-]
+templates = Jinja2Templates(directory="templates")
 
 @app.get("/")
 def home(request: Request):
@@ -57,6 +50,11 @@ def persons_page(request: Request, person_id: str):
         status_code=status.HTTP_404_NOT_FOUND, 
         detail="Person not found"
     )
+
+@app.post("/api/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
+    pass
+
 
 @app.post("/api/persons", response_model=PersonResponse, status_code=status.HTTP_201_CREATED)
 def create_person(person: PersonCreate):
