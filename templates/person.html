@@ -5,6 +5,7 @@
         <span>Fullname:</span>
         <span>{{ person.firstname }}</span>
         <span>{{ person.lastname }}</span>
+        <p>Report to: {{ person.owner.username }} Email: {{ person.owner.email }}</p>
 
         <div></div>
         <a href="{{ url_for("home") }}">

@@ -23,10 +23,18 @@ class Person(BaseModel):
     lastname: str = Field(min_length=1)
     age: int
     phone: str = Field(max_length=10)
-    reportTo: str | None
+    reportTo: int | None 
 
 class PersonCreate(Person):
-    user_id: int
+    pass 
+
+class PersonUpdate(BaseModel):
+    firstname: str = Field(default=None, min_length=1)
+    lastname: str = Field(default=None, min_length=1)
+    age: int = Field(default=None)
+    phone: str = Field(default=None)
+    reportTo: int | None = Field(default=None)
+
 
 class PersonResponse(Person):
     model_config = ConfigDict(from_attributes=True)

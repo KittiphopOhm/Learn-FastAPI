@@ -18,6 +18,8 @@ class User(Base):
         default=None,
     )
 
+    persons: Mapped[list[Person]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+
     @property
     def image_path(self) -> str:
         if self.image_file:
@@ -33,13 +35,16 @@ class Person(Base):
     lastname: Mapped[str] = mapped_column(String, nullable=False)
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     phone: Mapped[str] = mapped_column(String, nullable=False)
+    
     reportTo: Mapped[int] = mapped_column(
         ForeignKey("users.id"),
         nullable=False,
         index=True,
-    ),
+    ) 
+
+    owner: Mapped[User] = relationship(back_populates="persons")
+
     date_posted: Mapped[datetime] = mapped_column(
         DateTime(timezone=UTC),
         default=lambda: datetime.now(UTC)
     )
-

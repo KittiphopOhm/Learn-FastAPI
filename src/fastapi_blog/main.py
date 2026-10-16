@@ -16,68 +16,136 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-app.mount("media", StaticFiles(directory="media"), name="media")
+app.mount("/media", StaticFiles(directory="src/fastapi_blog/media"), name="media") 
 
 templates = Jinja2Templates(directory="templates")
 
 @app.get("/")
-def home(request: Request):
+def home(request: Request, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(select(model.Person))
+    persons = result.scalars().all()
     return templates.TemplateResponse(
         request, 
         "home.html", 
         {"persons": persons}
     )
 
-@app.get("/hypertext", include_in_schema=False)
-def get_html(): 
-    return f"<p>{persons[1]['lastname']}</p>"
-
 @app.get("/persons", response_model=list[PersonResponse])
-def get_persons():
-    return persons
+def get_persons(db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(select(model.Person))
+    return result.scalars().all()
 
 @app.get("/api/persons/{person_id}", response_model=PersonResponse)
-def persons_page(request: Request, person_id: str):
-    for person in persons:
-        if person.get("id") == person_id:
-            title = person["firstname"][:50]
-            return templates.TemplateResponse(
-                request,
-                "person.html",
-                {"person": person, "title": title},
-            )
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, 
-        detail="Person not found"
+def persons_page(request: Request, person_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.Person).where(model.Person.id == person_id)
     )
+    person = result.scalars().first()
+
+    if not person:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Person not found"
+        )
+    return templates.TemplateResponse(
+            request, 
+            "person.html", 
+            {"person": person}
+    )
+
+@app.put("/api/persons/{person_id}", response_model=PersonResponse)
+def update_person(person_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.Person).where(model.Person.id == person_id)
+    )
+    person = result.scalars().first()
+
+    if not person:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Person not found"
+        )
+
+@app.get("/api/users/{user_id}", response_model=UserResponse)
+def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.User).where(model.User.id == user_id)
+    )
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return user
+
+@app.get("/api/users/{user_id}/persons", response_model=list[PersonResponse])
+def get_user_persons(user_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.User).where(model.User.id == user_id)
+    )
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    result = db.execute(
+        select(model.Person).where(model.Person.reportTo == user_id)
+    )
+    return result.scalars().all()
 
 @app.post("/api/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
-    pass
+    result = db.execute(
+        select(model.User).where(model.User.email == user.email),
+    )
+    existing_user = result.scalars().first()
 
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User already exists"
+        )
+    new_user = model.User(
+        username=user.username,
+        email=user.email
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
 
 @app.post("/api/persons", response_model=PersonResponse, status_code=status.HTTP_201_CREATED)
-def create_person(person: PersonCreate):
-    new_id = max(p["id"] for p in persons) + 1 if persons else 1
+def create_person(person: PersonCreate, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.User).where(model.User.id == person.reportTo)
+    )
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User (reportTo) not found"
+        )
 
-    new_person = {
-        "id": new_id,
-        "firstname": person.firstname,
-        "lastname": person.lastname,
-        "age": person.age,
-        "phone": person.phone,
-        "date_posted": "Mon 12 Oct 2026"
-    }
-    persons.append(new_person)
+    new_person = model.Person(
+        firstname=person.firstname,
+        lastname=person.lastname,
+        age=person.age,
+        phone=person.phone,
+        reportTo=person.reportTo
+    )
+    db.add(new_person)
+    db.commit()
+    db.refresh(new_person)
     return new_person
 
 @app.exception_handler(StarletteHTTPException)
 def general_exception_handler(request: Request, exception: StarletteHTTPException):
-    message = (
-        exception.detail
-        if exception.detail
-        else "An error occured"
-    )
+    message = exception.detail if exception.detail else "An error occurred"
 
     if request.url.path.startswith("/api"):
         return JSONResponse(
