@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -18,7 +18,11 @@ class User(Base):
         default=None,
     )
 
-    persons: Mapped[list[Person]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    persons: Mapped[list[Person]] = relationship(
+        "Person",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def image_path(self) -> str:
@@ -42,9 +46,10 @@ class Person(Base):
         index=True,
     ) 
 
-    owner: Mapped[User] = relationship(back_populates="persons")
+    # Relationship ชี้กลับไปยัง User (ใช้ชื่อ owner ตรงตาม back_populates ของ User)
+    owner: Mapped[User] = relationship("User", back_populates="persons")
 
     date_posted: Mapped[datetime] = mapped_column(
         DateTime(timezone=UTC),
-        default=lambda: datetime.now(UTC)
+        default=lambda: datetime.now(UTC),
     )
