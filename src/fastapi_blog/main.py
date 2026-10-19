@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .models import model
 from .database import Base, engine, get_db
-from .schemas import PersonResponse, PersonCreate, UserResponse, UserCreate
+from .schemas import PersonResponse, PersonCreate, PersonUpdate, UserResponse, UserCreate, UserUpdate
 
 Base.metadata.create_all(bind=engine)
 
@@ -30,7 +30,7 @@ def home(request: Request, db: Annotated[Session, Depends(get_db)]):
         {"persons": persons}
     )
 
-@app.get("/persons", response_model=list[PersonResponse])
+@app.get("/api/persons", response_model=list[PersonResponse])
 def get_persons(db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(model.Person))
     return result.scalars().all()
@@ -53,8 +53,8 @@ def persons_page(request: Request, person_id: int, db: Annotated[Session, Depend
             {"person": person}
     )
 
-@app.put("/api/persons/{person_id}", response_model=PersonResponse)
-def update_person(person_id: int, db: Annotated[Session, Depends(get_db)]):
+@app.delete("/api/persons/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_persons(person_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(
         select(model.Person).where(model.Person.id == person_id)
     )
@@ -65,6 +65,66 @@ def update_person(person_id: int, db: Annotated[Session, Depends(get_db)]):
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Person not found"
         )
+
+    db.delete(person)
+    db.commit()
+
+
+@app.put("/api/persons/{person_id}", response_model=PersonResponse)
+def update_person(person_id: int, person_data:PersonCreate, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.Person).where(model.Person.id == person_id)
+    )
+    person = result.scalars().first()
+
+    if not person:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Person not found"
+        )
+
+    if person_data.reportTo != person.reportTo:
+        result = db.execute(
+            select(model.User).where(model.User.id == person_data.reportTo)
+        )
+        user = result.scalars().first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Person not found"
+            )
+
+    person.firstname = person_data.firstname
+    person.lastname = person_data.lastname
+    person.age = person_data.age
+    person.phone = person_data.phone
+    person.reportTo = person_data.reportTo
+
+    db.commit()
+    db.refresh(person)
+    return person
+
+@app.patch("/api/persons/{person_id}", response_model=PersonResponse)
+def update_person_partial(person_id: int, person_data: PersonUpdate, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.Person).where(model.Person.id == person_id)
+    )
+    person = result.scalars().first()
+
+    if not person:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Person not found"
+        )
+
+    update_data = person_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(person, field, value)
+
+    db.commit()
+    db.refresh(person)
+    return person
+
 
 @app.get("/api/users/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
@@ -118,6 +178,43 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
     db.commit()
     db.refresh(new_user)
     return new_user
+
+@app.patch("/api/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, user_data: UserUpdate, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.User).where(model.User.id == user_id)
+    )
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Person not found"
+        )
+
+    update_data = user_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+@app.delete("/api/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_persons(user_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(
+        select(model.User).where(model.User.id == user_id)
+    )
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Person not found"
+        )
+
+    db.delete(user)
+    db.commit()
 
 @app.post("/api/persons", response_model=PersonResponse, status_code=status.HTTP_201_CREATED)
 def create_person(person: PersonCreate, db: Annotated[Session, Depends(get_db)]):

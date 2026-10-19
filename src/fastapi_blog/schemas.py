@@ -9,6 +9,11 @@ class User(BaseModel):
 class UserCreate(User):
     pass
 
+class UserUpdate(BaseModel):
+    username: str = Field(default=None, min_length=3)
+    email: EmailStr = Field(default=None, min_length=5)
+    image_file: str | None = Field(default=None, min_length=5)
+
 class UserResponse(User):
     model_config = ConfigDict(from_attributes=True)
 
@@ -34,7 +39,6 @@ class PersonUpdate(BaseModel):
     age: int = Field(default=None)
     phone: str = Field(default=None)
     reportTo: int | None = Field(default=None)
-
 
 class PersonResponse(Person):
     model_config = ConfigDict(from_attributes=True)
